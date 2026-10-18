@@ -1,4 +1,4 @@
-/* Любимое тело: сначала сеть (обновления приходят сразу), без сети — последняя сохранённая копия. Версия 18.10.2026, 23:41 */
+/* Любимое тело: сначала сеть (обновления приходят сразу), без сети — последняя сохранённая копия. Версия 18.10.2026, 23:55 */
 var CACHE = 'telo-v1';
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
@@ -28,4 +28,10 @@ self.addEventListener('notificationclick', function (e) {
     for (var i = 0; i < list.length; i++) if ('focus' in list[i]) return list[i].focus();
     return clients.openWindow('./');
   }));
+});
+/* напоминания с Worker'а: вода, еда, «встать», утро и вечер */
+self.addEventListener('push', function (e) {
+  var d = { title: 'Любимое тело 🌿', body: 'Минутка для тебя', tag: 'telo' };
+  try { if (e.data) d = Object.assign(d, e.data.json()); } catch (err) {}
+  e.waitUntil(self.registration.showNotification(d.title, { body: d.body, tag: d.tag || 'telo', renotify: true, icon: 'icon-192.png', badge: 'icon-192.png', data: { url: './' } }));
 });
