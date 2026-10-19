@@ -40,7 +40,7 @@ if (cmd === 'pull') {
   const planToday = adv && adv.date === mskDate, newPh = pids.filter(p => !food[p]);
   const out = [];
   if (req && (!adv || (adv.at || 0) < req)) out.push('ПЛАН: она написала дела и попросила план дня');
-  else if (!planToday && mm >= 10 * 60 + 30) out.push('ПЛАН: плана на сегодня ещё нет — собери из того, что есть');
+  else if (!planToday && mm >= 10 * 60 + 30 && mm < 13 * 60) out.push('ПЛАН: плана на сегодня ещё нет — собери из того, что есть');
   if (newPh.length) out.push('ФОТО: новых фото еды без разбора: ' + newPh.length + ' (pid: ' + newPh.join(', ') + ')');
   console.log(out.length ? out.join('\n') : 'НЕТ ЗАПРОСА');
 } else if (cmd === 'food' && a1) {
