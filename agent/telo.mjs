@@ -32,24 +32,28 @@ if (cmd === 'pull') {
 } else if (cmd === 'pending') {
   /* нужен ли сейчас план дня: она нажала «Спланировать мой день» позже последнего плана, или уже 10:30, а плана на сегодня нет */
   const { days } = await api('/j?days=2'), today = new Date().toISOString().slice(0, 10);
-  let req = 0; const pids = [];
-  for (const { box } of days) { const j = JSON.parse(await open(box)); req = Math.max(req, +(j.keys?.['planReq_' + today] || 0)); for (const m of j.keys?.meals || []) if (m.pid) pids.push(m.pid) }
+  let req = 0, eveReq = 0; const pids = [], notes = {};
+  for (const { box } of days) { const j = JSON.parse(await open(box)); req = Math.max(req, +(j.keys?.['planReq_' + today] || 0)); eveReq = Math.max(eveReq, +(j.keys?.['eveReq_' + today] || 0)); for (const m of j.keys?.meals || []) if (m.pid) { pids.push(m.pid); notes[m.pid] = m.note || '' } }
   let adv = null; const r = await api('/advice/morning'); if (r.box) adv = JSON.parse(await open(r.box));
   let food = {}; const rf = await api('/advice/food'); if (rf.box) food = JSON.parse(await open(rf.box)).items || {};
   const msk = new Date(Date.now() + 3 * 36e5), mm = msk.getUTCHours() * 60 + msk.getUTCMinutes(), mskDate = msk.toISOString().slice(0, 10);
-  const planToday = adv && adv.date === mskDate, newPh = pids.filter(p => !food[p]);
+  const planToday = adv && adv.date === mskDate, newPh = pids.filter(p => !food[p] || (food[p].note ?? '') !== notes[p]); // новое фото или она поменяла подпись
+  let eve = null; const re = await api('/advice/evening'); if (re.box) eve = JSON.parse(await open(re.box));
   const out = [];
+  if ((eveReq && (!eve || (eve.at || 0) < eveReq)) || (mm >= 20 * 60 + 50 && !(eve && eve.date === today))) out.push('ВЕЧЕР: сделай разбор дня (её дневник keys.diary_' + today + ')');
   if (req && (!adv || (adv.at || 0) < req)) out.push('ПЛАН: она написала дела и попросила план дня');
   else if (!planToday && mm >= 10 * 60 + 30 && mm < 13 * 60) out.push('ПЛАН: плана на сегодня ещё нет — собери из того, что есть');
-  if (newPh.length) out.push('ФОТО: новых фото еды без разбора: ' + newPh.length + ' (pid: ' + newPh.join(', ') + ')');
+  if (newPh.length) out.push('ФОТО: разобрать (новые или с новой подписью): ' + newPh.map(p => p + (notes[p] ? ' — её подпись: «' + notes[p] + '»' : '')).join('; ') + ' | После фото обнови итог еды за весь день (day).');
   console.log(out.length ? out.join('\n') : 'НЕТ ЗАПРОСА');
 } else if (cmd === 'food' && a1) {
-  /* разбор фото: {"pid":{"dish","palms","iron","veg","tip"}} — дописывается к прошлым разборам */
-  const add = JSON.parse(fs.readFileSync(a1, 'utf8')); let items = {}; const rf = await api('/advice/food'); if (rf.box) items = JSON.parse(await open(rf.box)).items || {};
-  for (const [k, v] of Object.entries(add)) items[k] = { ...v, at: Date.now() };
-  const keep = Object.entries(items).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)).slice(0, 300);
-  await api('/advice/food', { method: 'POST', body: JSON.stringify({ box: await seal({ at: Date.now(), items: Object.fromEntries(keep) }) }) }); console.log('✓ разбор фото отправлен:', Object.keys(add).length);
-} else if (cmd === 'advice' && ['morning', 'week'].includes(a1) && a2) {
+  /* разбор еды: {"items":{"pid":{"dish","palms","veg","tip","note"}},"day":{"date","palms","iron","lines":[]}} — дописывается к прошлым */
+  const add = JSON.parse(fs.readFileSync(a1, 'utf8')), addItems = add.items || (add.day ? {} : add);
+  let prev = { items: {}, days: {} }; const rf = await api('/advice/food'); if (rf.box) prev = { items: {}, days: {}, ...JSON.parse(await open(rf.box)) };
+  for (const [k, v] of Object.entries(addItems)) prev.items[k] = { ...v, at: Date.now() };
+  if (add.day && add.day.date) prev.days[add.day.date] = { ...add.day, at: Date.now() };
+  const keep = Object.entries(prev.items).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)).slice(0, 300), keepD = Object.entries(prev.days).sort().slice(-30);
+  await api('/advice/food', { method: 'POST', body: JSON.stringify({ box: await seal({ at: Date.now(), items: Object.fromEntries(keep), days: Object.fromEntries(keepD) }) }) }); console.log('✓ разбор еды отправлен: фото', Object.keys(addItems).length, add.day ? '+ итог дня' : '');
+} else if (cmd === 'advice' && ['morning', 'week', 'evening'].includes(a1) && a2) {
   const obj = JSON.parse(fs.readFileSync(a2, 'utf8')); obj.at = Date.now();
   await api('/advice/' + a1, { method: 'POST', body: JSON.stringify({ box: await seal(obj) }) }); console.log('✓ отправлено в приложение:', a1);
 } else if (cmd === 'notify') {
