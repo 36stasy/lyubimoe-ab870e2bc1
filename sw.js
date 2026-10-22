@@ -1,4 +1,4 @@
-/* Любимое тело: сначала сеть (обновления приходят сразу), без сети — последняя сохранённая копия. Версия 22.10.2026, 13:52 */
+/* Любимое тело: сначала сеть (обновления приходят сразу), без сети — последняя сохранённая копия. Версия 22.10.2026, 13:59 */
 var CACHE = 'telo-v1';
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
